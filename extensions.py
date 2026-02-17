@@ -1,41 +1,51 @@
 import requests
-import json
 from config import CURRENCIES
 
-# 1. Собственное исключение
+
 class APIException(Exception):
+    """Класс для обработки ошибок пользователя и API"""
     pass
 
-# 2. Класс для работы с API
+
 class CurrencyConverter:
     @staticmethod
     def get_price(base: str, quote: str, amount: str):
-        # Проверка, что введены корректные названия валют
+        # 1. Проверяем наличие валют в нашем словаре
         if base not in CURRENCIES:
-            raise APIException(f'Не удалось обработать валюту {base}')
+            raise APIException(f'Валюта "{base}" не найдена. Список: /values')
+
         if quote not in CURRENCIES:
-            raise APIException(f'Не удалось обработать валюту {quote}')
+            raise APIException(f'Валюта "{quote}" не найдена. Список: /values')
 
-        # Проверка на совпадение валют
+        # 2. Проверяем логику (нельзя менять доллар на доллар)
         if base == quote:
-            raise APIException(f'Нельзя перевести одинаковые валюты {base}!')
+            raise APIException(f'Нельзя перевести {base} в {base}. Выберите разные валюты.')
 
-        # Проверка, что количество — это число
+        # 3. Валидация числа
         try:
-            amount = float(amount)
+            amount_val = float(amount.replace(',', '.'))  # На случай, если введут "10,5"
         except ValueError:
-            raise APIException(f'Не удалось обработать количество {amount}')
+            raise APIException(f'Не удалось обработать количество: {amount}')
 
-        # Отправка запроса к API
+        # 4. Запрос к API
         try:
-            url = f'https://api.exchangerate-api.com/v4/latest/{CURRENCIES[base]}'
-            response = requests.get(url)
-            data = json.loads(response.text)
-        except requests.exceptions.RequestException:
-            raise APIException('Ошибка при запросе к API. Проверьте интернет-соединение.')
+            base_ticker = CURRENCIES[base]
+            quote_ticker = CURRENCIES[quote]
 
-        # Парсинг ответа и расчет
-        rate = data['rates'][CURRENCIES[quote]]
-        converted_amount = rate * amount
+            url = f'https://api.exchangerate-api.com/v4/latest/{base_ticker}'
+            response = requests.get(url, timeout=10)  # Добавляем таймаут, чтобы бот не завис
 
-        return converted_amount
+            # Проверяем, что сервер ответил успешно
+            if response.status_code != 200:
+                raise APIException('Сервер API временно недоступен.')
+
+            data = response.json()  # Питонический способ парсинга JSON
+
+            rate = data['rates'].get(quote_ticker)
+            if not rate:
+                raise APIException(f'Не удалось получить курс для {quote}')
+
+            return rate * amount_val
+
+        except requests.exceptions.RequestException as e:
+            raise APIException(f'Ошибка сети: {e}')

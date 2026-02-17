@@ -1,4 +1,12 @@
-TOKEN="8322224399:AAHvQHtIIMGqtSAyGMaHyDbx6ffHck8fGcg"
+import os
+from dotenv import load_dotenv
+
+# Загружаем переменные из файла .env
+load_dotenv()
+
+TOKEN = os.getenv("BOT_TOKEN")
+
+# Словарь валют: оставляем и русские, и англ названия для удобства
 CURRENCIES = {
     'рубль': 'RUB',
     'доллар': 'USD',
